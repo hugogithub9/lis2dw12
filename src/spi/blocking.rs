@@ -221,7 +221,7 @@ where
 #[cfg(feature = "out_f32")]
 impl<SPI, SpiError, CS, PinError> Accelerometer for Lis2dw12<SPI, CS>
 where
-    SPI: SpiDevice< Error = SpiError>,
+    SPI: SpiDevice<Error = SpiError>,
     CS: OutputPin<Error = PinError>,
     SpiError: Debug,
     PinError: Debug,
