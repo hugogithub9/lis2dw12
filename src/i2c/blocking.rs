@@ -2,7 +2,7 @@ use crate::*;
 use accelerometer::{vector::I16x3, RawAccelerometer};
 use core::fmt::Debug;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::i2c::I2cDevice;
+use embedded_hal_async::i2c::{I2c, SevenBitAddress};
 use lis2dw12::Lis2dw12;
 
 #[cfg(feature = "out_f32")]
@@ -11,9 +11,9 @@ use num_traits::FromPrimitive;
 #[cfg(feature = "out_f32")]
 pub use accelerometer::{vector::F32x3, Accelerometer};
 
-impl<I2c, I2CError, CS, PinError> Lis2dw12<I2c, CS>
+impl<I2cImpl, I2CError, CS, PinError> Lis2dw12<I2cImpl, CS>
 where
-    I2c: I2cDevice<Error = I2cError>,
+    I2cImpl: I2c<Error = I2cError>,
     CS: OutputPin<Error = PinError>,
 {
     pub fn check_who_am_i(&mut self) -> Result<(), Error<I2cError, PinError>> {

@@ -2,14 +2,17 @@ use crate::i2c::Lis2dw12;
 use crate::*;
 use accelerometer::vector::I16x3;
 use embedded_hal::digital::OutputPin;
-use embedded_hal_async::i2c::I2cDevice;
+use embedded_hal_async::i2c::{I2c, SevenBitAddress};
+use lis2dw12::FullScaleSelection;
+
+const LIS2DW12_ADDR: u8 = 0x1D;
 
 #[cfg(feature = "out_f32")]
 pub use accelerometer::vector::F32x3;
 
-impl<I2c, I2cError, CS, PinError> Lis2dw12<I2c, CS>
+impl<I2cImpl, I2cError, CS, PinError> Lis2dw12<I2cImpl, CS>
 where
-    I2c: I2cDevice<Error = I2cError>,
+    I2cImpl: I2c<SevenBitAddress, Error = I2cError>,
     CS: OutputPin<Error = PinError>,
 {
     pub async fn check_who_am_i(&mut self) -> Result<(), Error<I2cError, PinError>> {
@@ -205,9 +208,9 @@ where
     }
 
     async fn write_then_read(&mut self, request: u8) -> Result<u8, Error<I2cError, PinError>> {
-        self.i2c.write(&[request]).await?;
+        self.i2c.write(LIS2DW12_ADDR, &[request]).await?;
         let mut data = [0; 1];
-        self.i2c.read(&mut data).await?;
+        self.i2c.read(LIS2DW12_ADDR, &mut data).await?;
         Ok(data[0])
     }
 
@@ -216,11 +219,11 @@ where
         request: u8,
         buf: &mut [u8],
     ) -> Result<(), Error<I2cError, PinError>> {
-        self.i2c.write(&[request]).await?;
+        self.i2c.write(LIS2DW12_ADDR, &[request]).await?;
 
         let mut data = [0; 1];
         for x in buf {
-            self.i2c.read(&mut data).await?;
+            self.i2c.read(LIS2DW12_ADDR, &mut data).await?;
             *x = data[0];
         }
 
@@ -232,8 +235,8 @@ where
         request: u8,
         data: u8,
     ) -> Result<(), Error<I2cError, PinError>> {
-        self.i2c.write(&[request]).await?;
-        self.i2c.write(&[data]).await?;
+        self.i2c.write(LIS2DW12_ADDR, &[request]).await?;
+        self.i2c.write(LIS2DW12_ADDR, &[data]).await?;
         Ok(())
     }
 
