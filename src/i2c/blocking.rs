@@ -2,7 +2,8 @@ use crate::*;
 use accelerometer::{vector::I16x3, RawAccelerometer};
 use core::fmt::Debug;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::i2c::I2CDevice;
+use embedded_hal::i2c::I2cDevice;
+use lis2dw12::Lis2dw12;
 
 #[cfg(feature = "out_f32")]
 use num_traits::FromPrimitive;
@@ -10,12 +11,12 @@ use num_traits::FromPrimitive;
 #[cfg(feature = "out_f32")]
 pub use accelerometer::{vector::F32x3, Accelerometer};
 
-impl<I2C, I2CError, CS, PinError> Lis2dw12<I2C, CS>
+impl<I2c, I2CError, CS, PinError> Lis2dw12<I2c, CS>
 where
-    I2C: I2CDevice<Error = I2CError>,
+    I2c: I2cDevice<Error = I2cError>,
     CS: OutputPin<Error = PinError>,
 {
-    pub fn check_who_am_i(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    pub fn check_who_am_i(&mut self) -> Result<(), Error<I2cError, PinError>> {
         let device_id = self.get_device_id()?;
         if device_id != reg::DEVICE_ID {
             return Err(Error::InvalidWhoAmI(device_id));
@@ -26,7 +27,7 @@ where
     pub fn set_low_power_mode(
         &mut self,
         low_power_mode: LowPowerMode,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0000_0011;
         self.reg_reset_bits(Register::CTRL1, reset_bits)?;
         self.reg_set_bits(Register::CTRL1, low_power_mode as u8)?;
@@ -36,7 +37,7 @@ where
     pub fn set_operating_mode(
         &mut self,
         mode: OperatingMode,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0000_1100;
         let set_bits = (mode as u8) << 2;
         self.reg_reset_bits(Register::CTRL1, reset_bits)?;
@@ -50,7 +51,7 @@ where
         Ok(())
     }
 
-    pub fn set_low_noise(&mut self, is_enabled: bool) -> Result<(), Error<I2CError, PinError>> {
+    pub fn set_low_noise(&mut self, is_enabled: bool) -> Result<(), Error<I2cError, PinError>> {
         let bits = 0b0000_0100;
         if is_enabled {
             self.reg_set_bits(Register::CTRL1, bits)?;
@@ -64,7 +65,7 @@ where
     pub fn set_full_scale_selection(
         &mut self,
         full_scale_selection: FullScaleSelection,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0011_0000;
         let set_bits = (full_scale_selection as u8) << 4;
         self.reg_reset_bits(Register::CTRL6, reset_bits)?;
@@ -81,7 +82,7 @@ where
     pub fn set_output_data_rate(
         &mut self,
         odr: OutputDataRate,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b1111_0000;
         let set_bits = (odr as u8) << 4;
         self.reg_reset_bits(Register::CTRL1, reset_bits)?;
@@ -89,11 +90,11 @@ where
         Ok(())
     }
 
-    pub fn get_device_id(&mut self) -> Result<u8, Error<I2CError, PinError>> {
+    pub fn get_device_id(&mut self) -> Result<u8, Error<I2cError, PinError>> {
         self.read_reg(Register::WHO_AM_I)
     }
 
-    pub fn get_raw(&mut self) -> Result<I16x3, Error<I2CError, PinError>> {
+    pub fn get_raw(&mut self) -> Result<I16x3, Error<I2cError, PinError>> {
         let mut buf = [0u8; 6];
         self.read_regs(Register::OUT_X_L, &mut buf)?;
 
@@ -106,7 +107,7 @@ where
 
     /// Get normalized ±g reading from the accelerometer
     #[cfg(feature = "out_f32")]
-    pub fn get_norm(&mut self) -> Result<F32x3, Error<I2CError, PinError>> {
+    pub fn get_norm(&mut self) -> Result<F32x3, Error<I2cError, PinError>> {
         let acc_raw: I16x3 = self.get_raw()?;
 
         let sensitivity: f32 = match self.scale {
@@ -127,7 +128,7 @@ where
         &mut self,
         register: Register,
         buf: &mut [u8],
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         // this flag allows us to call read multiple times and the register will automatically be incremented
         const IF_ADD_INC: u8 = 0b0000_0100;
         self.reg_set_bits(Register::CTRL2, IF_ADD_INC)?;
@@ -141,15 +142,15 @@ where
         result
     } // senyo simpson
 
-    fn reg_set_bits(&mut self, reg: Register, bits: u8) -> Result<(), Error<I2CError, PinError>> {
+    fn reg_set_bits(&mut self, reg: Register, bits: u8) -> Result<(), Error<I2cError, PinError>> {
         self.modify_reg(reg, |v| v | bits)
     }
 
-    fn reg_reset_bits(&mut self, reg: Register, bits: u8) -> Result<(), Error<I2CError, PinError>> {
+    fn reg_reset_bits(&mut self, reg: Register, bits: u8) -> Result<(), Error<I2cError, PinError>> {
         self.modify_reg(reg, |v| v & !bits)
     }
 
-    fn modify_reg<F>(&mut self, reg: Register, f: F) -> Result<(), Error<I2CError, PinError>>
+    fn modify_reg<F>(&mut self, reg: Register, f: F) -> Result<(), Error<I2cError, PinError>>
     where
         F: FnOnce(u8) -> u8,
     {
@@ -158,14 +159,14 @@ where
         Ok(())
     }
 
-    fn write_reg(&mut self, register: Register, data: u8) -> Result<(), Error<I2CError, PinError>> {
+    fn write_reg(&mut self, register: Register, data: u8) -> Result<(), Error<I2cError, PinError>> {
         self.chip_select()?;
         let result = self.write_then_write(register.addr(), data);
         self.chip_deselect()?;
         result
     }
 
-    fn read_reg(&mut self, register: Register) -> Result<u8, Error<I2CError, PinError>> {
+    fn read_reg(&mut self, register: Register) -> Result<u8, Error<I2cError, PinError>> {
         self.chip_select()?;
         let request = 0b1000_0000 | register.addr(); // set the read bit
         let result = self.write_then_read(request);
@@ -173,7 +174,7 @@ where
         result
     }
 
-    fn write_then_read(&mut self, request: u8) -> Result<u8, Error<I2CError, PinError>> {
+    fn write_then_read(&mut self, request: u8) -> Result<u8, Error<I2cError, PinError>> {
         let mut buf = [request];
         self.i2c.transfer_in_place(&mut buf)?;
         Ok(buf[0])
@@ -183,34 +184,34 @@ where
         &mut self,
         request: u8,
         buf: &mut [u8],
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.i2c.write(&[request])?;
         Ok(self.i2c.read(buf)?)
     }
 
-    fn write_then_write(&mut self, request: u8, data: u8) -> Result<(), Error<I2CError, PinError>> {
+    fn write_then_write(&mut self, request: u8, data: u8) -> Result<(), Error<I2cError, PinError>> {
         self.i2c.write(&[request])?;
         self.i2c.write(&[data])?;
         Ok(())
     }
 
-    fn chip_select(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    fn chip_select(&mut self) -> Result<(), Error<I2cError, PinError>> {
         self.cs.set_low().map_err(Error::Pin)
     }
 
-    fn chip_deselect(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    fn chip_deselect(&mut self) -> Result<(), Error<I2cError, PinError>> {
         self.cs.set_high().map_err(Error::Pin)
     }
 }
 
-impl<I2C, I2CError, CS, PinError> RawAccelerometer<I16x3> for Lis2dw12<I2C, CS>
+impl<I2c, I2cError, CS, PinError> RawAccelerometer<I16x3> for Lis2dw12<I2c, CS>
 where
-    I2C: I2CDevice<Error = I2CError>,
+    I2c: I2cDevice<Error = I2cError>,
     CS: OutputPin<Error = PinError>,
-    I2CError: Debug,
+    I2cError: Debug,
     PinError: Debug,
 {
-    type Error = Error<I2CError, PinError>;
+    type Error = Error<I2cError, PinError>;
 
     /// Get acceleration reading from the accelerometer
     fn accel_raw(&mut self) -> Result<I16x3, accelerometer::Error<Self::Error>> {
@@ -219,14 +220,14 @@ where
 }
 
 #[cfg(feature = "out_f32")]
-impl<I2C, I2CError, CS, PinError> Accelerometer for Lis2dw12<I2C, CS>
+impl<I2c, I2cError, CS, PinError> Accelerometer for Lis2dw12<I2c, CS>
 where
-    I2C: I2CDevice<Error = I2CError>,
+    I2c: I2cDevice<Error = I2cError>,
     CS: OutputPin<Error = PinError>,
-    I2CError: Debug,
+    I2cError: Debug,
     PinError: Debug,
 {
-    type Error = Error<I2CError, PinError>;
+    type Error = Error<I2cError, PinError>;
 
     /// Get normalized ±g reading from the accelerometer
     fn accel_norm(&mut self) -> Result<F32x3, accelerometer::Error<Self::Error>> {

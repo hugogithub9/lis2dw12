@@ -1,3 +1,4 @@
+use crate::spi::Lis2dw12;
 use crate::*;
 use accelerometer::vector::I16x3;
 use embedded_hal::digital::OutputPin;

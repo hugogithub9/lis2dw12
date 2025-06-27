@@ -1,17 +1,18 @@
+use crate::i2c::Lis2dw12;
 use crate::*;
 use accelerometer::vector::I16x3;
 use embedded_hal::digital::OutputPin;
-use embedded_hal_async::i2c::I2CDevice;
+use embedded_hal_async::i2c::I2cDevice;
 
 #[cfg(feature = "out_f32")]
 pub use accelerometer::vector::F32x3;
 
-impl<I2C, I2CError, CS, PinError> Lis2dw12<I2C, CS>
+impl<I2c, I2cError, CS, PinError> Lis2dw12<I2c, CS>
 where
-    I2C: I2CDevice<Error = I2CError>,
+    I2c: I2cDevice<Error = I2cError>,
     CS: OutputPin<Error = PinError>,
 {
-    pub async fn check_who_am_i(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    pub async fn check_who_am_i(&mut self) -> Result<(), Error<I2cError, PinError>> {
         self.cs.set_high().map_err(Error::Pin)?;
         let device_id = self.get_device_id().await?;
         if device_id != reg::DEVICE_ID {
@@ -23,7 +24,7 @@ where
     pub async fn set_low_power_mode(
         &mut self,
         low_power_mode: LowPowerMode,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0000_0011;
         self.reg_reset_bits(Register::CTRL1, reset_bits).await?;
         self.reg_set_bits(Register::CTRL1, low_power_mode as u8)
@@ -34,7 +35,7 @@ where
     pub async fn set_operating_mode(
         &mut self,
         mode: OperatingMode,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0000_1100;
         let set_bits = (mode as u8) << 2;
         self.reg_reset_bits(Register::CTRL1, reset_bits).await?;
@@ -45,7 +46,7 @@ where
     pub async fn set_low_noise(
         &mut self,
         is_enabled: bool,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let bits = 0b0000_0100;
         if is_enabled {
             self.reg_set_bits(Register::CTRL1, bits).await?;
@@ -59,7 +60,7 @@ where
     pub async fn set_full_scale_selection(
         &mut self,
         full_scale_selection: FullScaleSelection,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b0011_0000;
         let set_bits = (full_scale_selection as u8) << 4;
         self.reg_reset_bits(Register::CTRL6, reset_bits).await?;
@@ -76,7 +77,7 @@ where
     pub async fn set_output_data_rate(
         &mut self,
         odr: OutputDataRate,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         let reset_bits = 0b1111_0000;
         let set_bits = (odr as u8) << 4;
         self.reg_reset_bits(Register::CTRL1, reset_bits).await?;
@@ -84,13 +85,13 @@ where
         Ok(())
     }
 
-    pub async fn get_device_id(&mut self) -> Result<u8, Error<I2CError, PinError>> {
+    pub async fn get_device_id(&mut self) -> Result<u8, Error<I2cError, PinError>> {
         self.read_reg(Register::WHO_AM_I).await
     }
 
     /// Temperature sensor data,
     /// `OUT_T_H`, `OUT_T_L`
-    pub async fn get_temperature_raw(&mut self) -> Result<(i8, u8), Error<I2CError, PinError>> {
+    pub async fn get_temperature_raw(&mut self) -> Result<(i8, u8), Error<I2cError, PinError>> {
         let mut buf = [0u8; 2];
         self.read_regs(Register::OUT_T_L, &mut buf).await?;
         Ok((buf[1] as i8, buf[0]))
@@ -99,7 +100,7 @@ where
     /// Temperature sensor data as float, only to be called in high power mode
     /// `OUT_T_H`, `OUT_T_L` converted to `f32`
     #[cfg(feature = "out_f32")]
-    pub async fn get_temperature_high_power(&mut self) -> Result<f32, Error<I2CError, PinError>> {
+    pub async fn get_temperature_high_power(&mut self) -> Result<f32, Error<I2cError, PinError>> {
         let (out_h, out_l) = self.get_temperature_raw().await?;
 
         // 12-bit resolution
@@ -107,11 +108,11 @@ where
         Ok(value as f32 * 0.0625 + 25.0) // in 12 bit mode each value is 16th of a degree C. Midpoint 25C
     }
 
-    pub async fn get_temperature_low_power(&mut self) -> Result<i8, Error<I2CError, PinError>> {
+    pub async fn get_temperature_low_power(&mut self) -> Result<i8, Error<I2cError, PinError>> {
         Ok(self.read_reg(Register::OUT_T).await? as i8 + 25) // midpoint is 25C
     }
 
-    pub async fn get_raw(&mut self) -> Result<I16x3, Error<I2CError, PinError>> {
+    pub async fn get_raw(&mut self) -> Result<I16x3, Error<I2cError, PinError>> {
         let mut buf = [0u8; 6];
         self.read_regs(Register::OUT_X_L, &mut buf).await?;
 
@@ -124,7 +125,7 @@ where
 
     /// Get normalized ±g reading from the accelerometer
     #[cfg(feature = "out_f32")]
-    pub async fn get_norm(&mut self) -> Result<F32x3, Error<I2CError, PinError>> {
+    pub async fn get_norm(&mut self) -> Result<F32x3, Error<I2cError, PinError>> {
         let acc_raw: I16x3 = self.get_raw().await?;
 
         let sensitivity: f32 = match self.scale {
@@ -145,7 +146,7 @@ where
         &mut self,
         register: Register,
         buf: &mut [u8],
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         // this flag allows us to call read multiple times and the register will automatically be incremented
         const IF_ADD_INC: u8 = 0b0000_0100;
         self.reg_set_bits(Register::CTRL2, IF_ADD_INC).await?;
@@ -163,7 +164,7 @@ where
         &mut self,
         reg: Register,
         bits: u8,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.modify_reg(reg, |v| v | bits).await
     }
 
@@ -171,11 +172,11 @@ where
         &mut self,
         reg: Register,
         bits: u8,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.modify_reg(reg, |v| v & !bits).await
     }
 
-    async fn modify_reg<F>(&mut self, reg: Register, f: F) -> Result<(), Error<I2CError, PinError>>
+    async fn modify_reg<F>(&mut self, reg: Register, f: F) -> Result<(), Error<I2cError, PinError>>
     where
         F: FnOnce(u8) -> u8,
     {
@@ -188,14 +189,14 @@ where
         &mut self,
         register: Register,
         data: u8,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.chip_select()?;
         let result = self.write_then_write(register.addr(), data).await;
         self.chip_deselect()?;
         result
     }
 
-    async fn read_reg(&mut self, register: Register) -> Result<u8, Error<I2CError, PinError>> {
+    async fn read_reg(&mut self, register: Register) -> Result<u8, Error<I2cError, PinError>> {
         self.chip_select()?;
         let request = 0b1000_0000 | register.addr(); // set the read bit
         let result = self.write_then_read(request).await;
@@ -203,7 +204,7 @@ where
         result
     }
 
-    async fn write_then_read(&mut self, request: u8) -> Result<u8, Error<I2CError, PinError>> {
+    async fn write_then_read(&mut self, request: u8) -> Result<u8, Error<I2cError, PinError>> {
         self.i2c.write(&[request]).await?;
         let mut data = [0; 1];
         self.i2c.read(&mut data).await?;
@@ -214,7 +215,7 @@ where
         &mut self,
         request: u8,
         buf: &mut [u8],
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.i2c.write(&[request]).await?;
 
         let mut data = [0; 1];
@@ -230,17 +231,17 @@ where
         &mut self,
         request: u8,
         data: u8,
-    ) -> Result<(), Error<I2CError, PinError>> {
+    ) -> Result<(), Error<I2cError, PinError>> {
         self.i2c.write(&[request]).await?;
         self.i2c.write(&[data]).await?;
         Ok(())
     }
 
-    fn chip_select(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    fn chip_select(&mut self) -> Result<(), Error<I2cError, PinError>> {
         self.cs.set_low().map_err(Error::Pin)
     }
 
-    fn chip_deselect(&mut self) -> Result<(), Error<I2CError, PinError>> {
+    fn chip_deselect(&mut self) -> Result<(), Error<I2cError, PinError>> {
         self.cs.set_high().map_err(Error::Pin)
     }
 }
