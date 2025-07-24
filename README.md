@@ -1,3 +1,10 @@
+This project was part of my exploration of embedded Rust as sensor. Although the LIS2DW12 supports both SPI and I2C, most available examples focused only on SPI.
+To better understand how embedded communication works, I decided to implement the I2C communication logic myself, both in blocking and non-blocking versions.
+This hands-on approach helped me gain a deeper understanding of:
+how I2C works at the hardware and software level,
+how to communicate with slave devices in Rust,
+and how to handle low-level errors properly.
+
 # `lis2dw12`
 
 A no_std compatible Rust driver for the low power ST 3-Axis MEMS 14-bit accelerometer LIS2DW12 using the SPI bus
